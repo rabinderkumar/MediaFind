@@ -1,0 +1,6 @@
+{
+  "name": "MediaFind",
+  "description": "An AI-powered media library search and face recognition application for press and media departments.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
