@@ -3,21 +3,26 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
-import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DatabaseSchema, Photo, Face, Person, Album, AuditLog, SearchFilters } from './src/types';
 
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
+// APP_ROOT: where the built frontend (dist/) lives. Defaults to cwd (normal usage),
+// but can be overridden (e.g. by the Electron main process) to point at bundled resources.
+const APP_ROOT = process.env.MEDIAFIND_APP_ROOT || process.cwd();
 
 // Increase request size limit for base64 image uploads
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 // Ensure directories exist
-const DATA_DIR = path.join(process.cwd(), 'data');
+// DATA_DIR: where uploads/thumbnails/db.json are stored. Defaults to cwd/data (normal usage),
+// but can be overridden (e.g. by the Electron main process) to point at a writable user data folder.
+const DATA_DIR = process.env.MEDIAFIND_DATA_DIR || path.join(process.cwd(), 'data');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const THUMBNAILS_DIR = path.join(DATA_DIR, 'thumbnails');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
@@ -582,8 +587,8 @@ app.delete('/api/photos/:id', (req, res) => {
   const photo = db.photos[photoIndex];
   // Remove photo file
   try {
-    const origPath = path.join(process.cwd(), 'data', photo.filepath);
-    const thumbPath = path.join(process.cwd(), 'data', photo.thumbnail_path);
+    const origPath = path.join(DATA_DIR, photo.filepath);
+    const thumbPath = path.join(DATA_DIR, photo.thumbnail_path);
     if (fs.existsSync(origPath)) fs.unlinkSync(origPath);
     if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
   } catch (err) {
@@ -1140,13 +1145,14 @@ app.post('/api/backup/import', (req, res) => {
 // Vite Middleware for development OR static serving for production
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    const distPath = path.join(APP_ROOT, 'dist');
     app.use(express.static(distPath));
     // Serve uploads out of the built app context too
     app.use('/uploads', express.static(UPLOADS_DIR));
